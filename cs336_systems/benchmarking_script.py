@@ -71,7 +71,7 @@ def benchmarking_script(model_type):
 
     optimizer = AdamW(model.parameters())
     model.train()
-    for i in range(20):
+    for i in range(15):
         t1 = timeit.default_timer()
 
         a, b = get_random_data(DEVICE)
@@ -111,9 +111,10 @@ def benchmarking_script(model_type):
 
 
 if __name__ == "__main__":
-    benchmarking_script("xl")
-    benchmarking_script("small")
-    benchmarking_script("medium")
+    #benchmarking_script("test")
+    #benchmarking_script("small")
+    #benchmarking_script("medium")
     benchmarking_script("large")
-    benchmarking_script("xl")
-    benchmarking_script("10B")
+
+    #benchmarking_script("xl")
+    #benchmarking_script("10B")
