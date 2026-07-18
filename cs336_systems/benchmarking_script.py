@@ -67,7 +67,8 @@ def benchmarking_script(model_type):
         CONFIG[model_type]["d_ff"],
         10_000
     )
-    model.to(DEVICE)
+    model = torch.compile(model)
+    model = model.to(DEVICE)
 
     optimizer = AdamW(model.parameters())
     model.train()
@@ -103,18 +104,17 @@ def benchmarking_script(model_type):
         torch.cuda.synchronize()
         print(model_type, 
               i, 
-              round(t2 - t1, 4), 
-              round(t3 - t2, 4), 
-              round(t4 - t3, 4), 
-              round(t5 - t4, 4), 
-              round(t6 - t5, 4))
-
+              round(1000 * (t2 - t1), 1), 
+              round(1000 * (t3 - t2), 1), 
+              round(1000 * (t4 - t3), 1), 
+              round(1000 * (t5 - t4), 1), 
+              round(1000 * (t6 - t5), 1))
 
 if __name__ == "__main__":
     #benchmarking_script("test")
-    #benchmarking_script("small")
+    benchmarking_script("small")
     #benchmarking_script("medium")
-    benchmarking_script("large")
+    #benchmarking_script("large")
 
     #benchmarking_script("xl")
     #benchmarking_script("10B")
