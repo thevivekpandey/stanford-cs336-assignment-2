@@ -112,9 +112,9 @@ def benchmarking_script(model_type):
 
 if __name__ == "__main__":
     #benchmarking_script("test")
-    benchmarking_script("small")
+    #benchmarking_script("small")
     #benchmarking_script("medium")
     #benchmarking_script("large")
 
-    #benchmarking_script("xl")
+    benchmarking_script("xl")
     #benchmarking_script("10B")

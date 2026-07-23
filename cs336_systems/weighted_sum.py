@@ -1,6 +1,7 @@
 import torch
 import triton
 import triton.language as tl
+from einops import rearrange
 
 def weighted_sum(x, weight):
     #x has n dim shape [..., D] w has 1d shape [D]
@@ -105,16 +106,16 @@ def weighted_sum_backward(
         order=(0, ),
     )
 
-    grad_x_block_ptr = tl.make_block_ptr
+    grad_x_block_ptr = tl.make_block_ptr(
         grad_x_ptr,
         shape=(NUM_ROWS, D),
         strides=(stride_gxr, stride_gxd,),
         offsets=(rows_tile_idx * ROWS_TILE_SIZE, 0,),
-        block_shapes=(ROWS_TILE_SIZE D_TILE_SIZE),
+        block_shapes=(ROWS_TILE_SIZE, D_TILE_SIZE,),
         order=(1, 0),
     )
    
-   partial_grad_weight_block_ptr = tl.make_block_ptr(
+    partial_grad_weight_block_ptr = tl.make_block_ptr(
         partial_grad_weight_ptr,
         shape=(n_row_tiles, D,),
         strides=(strides_gwb, strides_gwd,),
@@ -128,7 +129,7 @@ def weighted_sum_backward(
 
         weight = tl.load(weight_block_ptr, boundary_check=(0,), padding_option="zero")
         grad_x_row = grad_output[: None] * weight[None: ]
-        tl.store(grad_x_block_ptr, grad_x_row,, boundary_check=(0, 1))
+        tl.store(grad_x_block_ptr, grad_x_row, boundary_check=(0, 1))
 
         row = tl.load(x_block_ptr, boundary_check=(0,), padding_option="zero")
         grad_weight_row = tl.sum(row * grad_output[:, None], axis=0, keep_dims=True)
@@ -154,7 +155,7 @@ class WeightedSumFunc(torch.autograd.Function):
         assert x.is_cuda and weight.is_cuda, "Expected CUDA tensors"
         assert x.is_contiguous(), "Our pointer arithmetic will assume contiguous x"
 
-        ctx.D_TILE_SIZE = triton.next_power_of_two(D) // 16
+        ctx.D_TILE_SIZE = triton.next_power_of_2(D) // 16
         ctx.ROWS_TILE_SIZE = 16
         ctx.input_shape = input_shape
 
@@ -199,9 +200,18 @@ class WeightedSumFunc(torch.autograd.Function):
         return grad_x, grad_weight
 
 if __name__ == "__main__":
-    x = torch.rand(3, 3)
-    w = torch.rand(3)
+    x = torch.rand(256, 256, device="cuda")
+    w = torch.rand(256, device="cuda")
+    print("x")
     print(x)
+    print("w")
     print(w)
+    print()
+
+    print("weighted sum")
     print(weighted_sum(x, w))
+
+    f_weighted_sum = WeightedSumFunc.apply(x, w)
+    print("also, weighted sum")
+    print(f_weighted_sum)
 
