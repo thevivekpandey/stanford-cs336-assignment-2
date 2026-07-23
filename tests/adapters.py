@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import torch
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'cs336_systems'))
+from cs336_systems.ddp import get_my_ddp
 
 
 
@@ -51,7 +55,7 @@ def get_ddp(module: torch.nn.Module) -> torch.nn.Module:
         Instance of a DDP class.
     """
     # For example: return DDP(module)
-    raise NotImplementedError
+    return get_my_ddp(module)
 
 
 def ddp_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -66,7 +70,7 @@ def ddp_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Opt
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    ddp_model.finish_gradient_synchronization()
 
 
 def get_fsdp(module: torch.nn.Module, compute_dtype: torch.dtype | None = None) -> torch.nn.Module:
