@@ -5,7 +5,7 @@ from einops import einsum
 class MyAttention(torch.autograd.Function):
     @staticmethod
     def forward(ctx, Q, K, V, is_causal=False):
-        d_model = Q.shape[1]
+        d = Q.shape[1]
         N_q = Q.shape[0]
         N_k = K.shape[0]
         #B_q, B_k = 16, 16
@@ -13,25 +13,32 @@ class MyAttention(torch.autograd.Function):
 
         T_q = math.ceil(N_q / B_q)
         T_k = math.ceil(N_k / B_k)
-        m_prev = torch.full((B_q, B_k), float('-inf'))
-        m_next = torch.full((B_q, B_k), float('-inf'))
+        m_prev = torch.full((B_q,), float('-inf'))
+        m_next = torch.full((B_q,), float('-inf'))
         print(m_prev)
 
-        O = torch.zeros(d_model, d_model)
+        O = torch.zeros(d, d)
         for i in range(T_q):
             print(f"Outer loop {i}")
             Qi = Q[i * B_q:i * B_q + B_q, :]
             print(Qi)
+            L = torch.zeros(B_q, 1)
+            O = torch.zeros(B_q, d)
             for j in range(T_k):
                 print(f"Inner loop {j}")
-                print(Kj)
                 Kj = K[j * B_k:j * B_k + B_k, :]
-                S = einsum(Qi, Kj, "... B_q d, ... B_k d -> ... B_q B_k") #/ torch.sqrt(torch.tensor([d_model]))
+                print(Kj)
+                S = einsum(Qi, Kj, "... B_q d, ... B_k d -> ... B_q B_k") #/ torch.sqrt(torch.tensor([d]))
                 print(S)
                 rowmax = torch.max(S, dim=-1).values
                 print(rowmax)
-                m_curr[i, :] = torch.max(m_prev[i, :], rowmax)
-                P = torch.exp(S - m_curr)
+                m_next = torch.max(m_prev, rowmax)
+                print(m_next)
+                P = torch.exp(S - m_next)
+                print(P)
+                L = torch.exp(m_prev-m_next) + torch.sum(P, dim=-1)
+                print(L)
+                m_prev = m_next
 
     @staticmethod
     def backward(ctx, grad_output):
