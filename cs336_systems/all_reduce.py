@@ -26,5 +26,5 @@ def distributed_demo(rank, world_size):
     dist.destroy_process_group()
 
 if __name__ == "__main__":
-    world_size = 4
+    world_size = 8
     mp.spawn(fn=distributed_demo, args=(world_size, ), nprocs=world_size, join=True)

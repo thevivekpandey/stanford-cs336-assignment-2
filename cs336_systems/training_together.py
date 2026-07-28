@@ -2,6 +2,7 @@ import sys
 import math
 import os
 import time
+import timeit
 import numpy as np
 import argparse
 
@@ -19,6 +20,8 @@ from cs336_basics.cross_entropy import cross_entropy
 from cs336_basics.learning_rate_schedule import learning_rate_schedule
 from cs336_basics.gradient_clipping import gradient_clipping
 from ddp import get_my_ddp
+#from minimal_ddp_flat import get_my_ddp
+#from ddp_overlap_individual_parameters import get_my_ddp
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -132,10 +135,13 @@ class Train:
           for group in optimizer.param_groups:
               group["lr"] = lr
 
+          t1 = timeit.default_timer()
           input_batch, target_batch = data_loading(train_data,
                                               self.batch_size,
                                               self.context_size,
                                               self.device)
+
+          t2 = timeit.default_timer()
 
           local_batch_size = self.batch_size // world_size
           start_idx = rank * local_batch_size
@@ -144,19 +150,35 @@ class Train:
           local_target = target_batch[start_idx: end_idx]
 
           optimizer.zero_grad()
+          t3 = timeit.default_timer()
           logits = model(local_input)
+          t4 = timeit.default_timer()
           loss = cross_entropy(logits, local_target)
+          t5 = timeit.default_timer()
 
           if rank == 0: #print loss only from rank 0
               print(f"step {step}: loss = {loss.item()}")
 
           loss.backward()
+          t6 = timeit.default_timer()
 
           model.finish_gradient_synchronization()
+          torch.cuda.synchronize()
+          t7 = timeit.default_timer()
           norm = grad_norm(model.parameters())
           gradient_clipping(model.parameters(), self.max_grad_norm)
+          t8 = timeit.default_timer()
           optimizer.step()
+          t9 = timeit.default_timer()
 
+          print(round(1000 * (t2 - t1), 1),
+                round(1000 * (t3 - t2), 1),
+                round(1000 * (t4 - t3), 1),
+                round(1000 * (t5 - t4), 1),
+                round(1000 * (t6 - t5), 1),
+                round(1000 * (t7 - t6), 1),
+                round(1000 * (t8 - t7), 1),
+                round(1000 * (t9 - t8), 1))
           metrics = {
               "step": step,
               "train_loss": loss.item(),
@@ -209,11 +231,12 @@ if __name__ == "__main__":
     parser.add_argument("--d_model", type=int, default=512, required=False)
     parser.add_argument("--num_layers", type=int, default=16, required=False)
     parser.add_argument("--context_size", type=int, default=256, required=False)
-    parser.add_argument("--batch_size", type=int, default=32, required=False)
-    parser.add_argument("--num_steps", type=int, default=1000, required=False)
-    parser.add_argument("--vocab_size", type=int, default=10000, required=False)
-    parser.add_argument("--d_ff", type=int, default=3072, required=False)
+    parser.add_argument("--batch_size", type=int, default=128, required=False)
+    parser.add_argument("--num_steps", type=int, default=20, required=False)
     parser.add_argument("--num_heads", type=int, default=16, required=False)
+    parser.add_argument("--d_ff", type=int, default=3072, required=False)
+    
+    parser.add_argument("--vocab_size", type=int, default=10000, required=False)
     parser.add_argument("--theta", type=float, default=10000.0, required=False)
     parser.add_argument("--max_seq_len", type=int, default=1024, required=False)
     parser.add_argument("--lr", type=float, default=1e-3, required=False)
@@ -257,6 +280,6 @@ if __name__ == "__main__":
             f"(token id {max_id} present). The embedding would index out of bounds."
         )
 
-    world_size = 2
+    world_size = 4
     t = Train(args.train_data, args.val_data, d_model, num_layers, context_size, batch_size, num_steps, vocab_size, d_ff, num_heads, theta, max_seq_len, lr, min_lr, warmup_iter, final_cosine_iter, max_grad_norm, args.max_train_seconds, args.bytes_per_token, vars(args), args.group)
     mp.spawn(fn=t.train, args=(world_size,), nprocs=world_size, join=True) 
