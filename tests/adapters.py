@@ -5,8 +5,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'cs336_systems'))
 from cs336_systems.ddp_overlap_individual_parameters import get_my_ddp
-
-
+from cs336_systems.optimizer_state_sharding import OptimizerStateSharding
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """
@@ -137,4 +136,4 @@ def get_sharded_optimizer(params, optimizer_cls: type[torch.optim.Optimizer], **
     Returns:
         Instance of sharded optimizer.
     """
-    raise NotImplementedError
+    return OptimizerStateSharding(params, optimizer_cls, **kwargs) 
