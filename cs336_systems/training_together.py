@@ -19,9 +19,10 @@ from cs336_basics.data_loading import data_loading
 from cs336_basics.cross_entropy import cross_entropy
 from cs336_basics.learning_rate_schedule import learning_rate_schedule
 from cs336_basics.gradient_clipping import gradient_clipping
-from ddp import get_my_ddp
+#from ddp import get_my_ddp
 #from minimal_ddp_flat import get_my_ddp
 #from ddp_overlap_individual_parameters import get_my_ddp
+from optimizer_state_sharding import OptimizerStateSharding
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -113,8 +114,8 @@ class Train:
                              self.d_ff,
                              self.device,
                              rope)
-       model = get_my_ddp(model)
-       optimizer = AdamW(model.parameters(), lr=self.lr)
+       #optimizer = AdamW(model.parameters(), lr=self.lr)
+       optimizer = OptimizerStateSharding(model.parameters(), AdamW, lr=self.lr)
        DIR = "checkpoints"
        os.makedirs(DIR, exist_ok=True)
        start_time = time.time()
@@ -127,13 +128,13 @@ class Train:
               break
           model.train()
 
-          lr = learning_rate_schedule(step,
-                                      self.lr,
-                                      self.min_lr,
-                                      self.warmup_iter,
-                                      self.final_cosine_iter)
-          for group in optimizer.param_groups:
-              group["lr"] = lr
+          #lr = learning_rate_schedule(step,
+          #                            self.lr,
+          #                            self.min_lr,
+          #                            self.warmup_iter,
+          #                            self.final_cosine_iter)
+          #for group in optimizer.param_groups:
+          #    group["lr"] = lr
 
           t1 = timeit.default_timer()
           input_batch, target_batch = data_loading(train_data,
@@ -183,7 +184,7 @@ class Train:
               "step": step,
               "train_loss": loss.item(),
               "train_bits_per_byte": loss.item() * self.bpb_scale,
-              "learning_rate": optimizer.param_groups[0]["lr"],
+              #"learning_rate": optimizer.param_groups[0]["lr"],
               "grad_norm": norm.item(),
               "wall_clock_time": time.time() - start_time,
           }
@@ -215,7 +216,7 @@ class Train:
                   # checkpoints load into a plain TransformerLM. getattr keeps
                   # this working if torch.compile is ever removed.
                   "model_state_dict": getattr(model, "_orig_mod", model).state_dict(),
-                  "optimizer_state_dict": optimizer.state_dict(),
+                  #"optimizer_state_dict": optimizer.state_dict(),
               }, checkpoint_path)
               print(f"step {step}: saved checkpoint to {checkpoint_path}")
 
